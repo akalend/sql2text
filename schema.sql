@@ -27,7 +27,6 @@ CREATE TABLE galaxy (
     discovered_by   VARCHAR(120),
     discovery_year  INTEGER,
     description     TEXT,
-    created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 -- ---------------------------------------------------------------------
@@ -35,7 +34,7 @@ CREATE TABLE galaxy (
 --    Каждое созвездие относится к одной галактике (как правило — Млечный Путь).
 -- ---------------------------------------------------------------------
 CREATE TABLE constellation (
-    constellation_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    constellation_id BIGINT SERIAL PRIMARY KEY,
     name             VARCHAR(120) NOT NULL,                -- напр. «Лира»
     latin_name       VARCHAR(120) NOT NULL UNIQUE,         -- Lyra
     abbr             CHAR(3) UNIQUE,                       -- Genitive abbreviation, напр. Lyr
@@ -61,10 +60,7 @@ CREATE TABLE star (
     name              VARCHAR(150),                        -- собственное имя (Вегa)
     bayer_designation VARCHAR(50),                         -- обозначение Байера (α Lyrae)
     catalog_id        VARCHAR(60) UNIQUE,                  -- HIP / HD / SAO номер
-    constellation_id  BIGINT REFERENCES constellation(constellation_id)
-                      ON DELETE SET NULL,
-    galaxy_id         BIGINT NOT NULL REFERENCES galaxy(galaxy_id)
-                      ON DELETE RESTRICT,
+    constellation_id  BIGINT REFERENCES constellation(constellation_id),
     spectral_class    VARCHAR(10),                         -- O B A F G K M + светимость
     luminosity_class  VARCHAR(5),                          -- Ia, II, V ...
     mass_suns         NUMERIC(10,4),                       -- масса в массах Солнца
@@ -79,7 +75,6 @@ CREATE TABLE star (
     is_variable       BOOLEAN NOT NULL DEFAULT FALSE,
     year_discovered   INTEGER,
     description       TEXT,
-    updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
     CHECK (spectral_class IS NULL OR spectral_class ~ '^[OBAFGKMLWT][0-9]')
 );
 
@@ -112,26 +107,8 @@ CREATE TABLE exoplanet (
     is_habitable     BOOLEAN NOT NULL DEFAULT FALSE,       -- находится в зоне обитаемости
     confirmed        BOOLEAN NOT NULL DEFAULT TRUE,
     description      TEXT,
-    updated_at       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
--- =====================================================================
--- ТРИГГЕР updated_at (идиоматично для PostgreSQL)
--- =====================================================================
-CREATE FUNCTION set_updated_at() RETURNS trigger AS $$
-BEGIN
-    NEW.updated_at := now();
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
-CREATE TRIGGER trg_star_updated_at
-    BEFORE UPDATE ON star
-    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
-
-CREATE TRIGGER trg_exoplanet_updated_at
-    BEFORE UPDATE ON exoplanet
-    FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- =====================================================================
 -- ИНДЕКСЫ для частых запросов
@@ -171,36 +148,26 @@ LEFT JOIN galaxy        g ON g.galaxy_id = COALESCE(s.galaxy_id, c.galaxy_id);
 -- =====================================================================
 -- ПРИМЕР ЗАПОЛНЕНИЯ (демонстрационные данные)
 -- =====================================================================
-INSERT INTO galaxy (name, galaxy_type, diameter_ly, distance_ly, alt_names) VALUES
-('Млечный Путь', 'barred_spiral', 105700, 0,    ARRAY['Milky Way','MW']),
-('Андромеда',    'spiral',        220000, 2537000, ARRAY['M31','NGC 224']);
+-- INSERT INTO galaxy (name, galaxy_type, diameter_ly, distance_ly, alt_names) VALUES
+-- ('Млечный Путь', 'barred_spiral', 105700, 0,    ARRAY['Milky Way','MW']),
+-- ('Андромеда',    'spiral',        220000, 2537000, ARRAY['M31','NGC 224']);
 
-INSERT INTO constellation (name, latin_name, abbr, galaxy_id, area_sq_deg) VALUES
-('Лира',   'Lyra',   'Lyr', 1, 286.5),
-('Лебедь', 'Cygnus', 'Cyg', 1, 804.0);
+-- INSERT INTO constellation (name, latin_name, abbr, galaxy_id, area_sq_deg) VALUES
+-- ('Лира',   'Lyra',   'Lyr', 1, 286.5),
+-- ('Лебедь', 'Cygnus', 'Cyg', 1, 804.0);
 
-INSERT INTO star (name, bayer_designation, constellation_id, galaxy_id,
-                  spectral_class, mass_suns, radius_suns, temperature_k,
-                  distance_ly, magnitude_app) VALUES
-('Вега',       'Alpha Lyrae',   1, 1, 'A0', 2.1, 2.4, 9602, 25.0, 0.03),
-('Денеб',      'Alpha Cygni',   2, 1, 'A2', 19.0, 203.0, 8500, 2615.0, 1.25),
-('Kepler-186', NULL,            2, 1, 'M1', 0.54, 0.50, 3788, 579.0, 14.6);
+-- INSERT INTO star (name, bayer_designation, constellation_id, galaxy_id,
+--                   spectral_class, mass_suns, radius_suns, temperature_k,
+--                   distance_ly, magnitude_app) VALUES
+-- ('Вега',       'Alpha Lyrae',   1, 1, 'A0', 2.1, 2.4, 9602, 25.0, 0.03),
+-- ('Денеб',      'Alpha Cygni',   2, 1, 'A2', 19.0, 203.0, 8500, 2615.0, 1.25),
+-- ('Kepler-186', NULL,            2, 1, 'M1', 0.54, 0.50, 3788, 579.0, 14.6);
 
-INSERT INTO exoplanet (name, star_id, planet_type, radius_earth, orbital_period_d,
-                       semi_major_axis, discovery_year, discovery_method, is_habitable) VALUES
-('Kepler-186 f', 3, 'rocky', 1.17, 129.94, 0.432, 2014, 'transit', TRUE),
-('Kepler-186 e', 3, 'rocky', 1.27, 22.41, 0.110, 2014, 'transit', FALSE);
+-- INSERT INTO exoplanet (name, star_id, planet_type, radius_earth, orbital_period_d,
+--                        semi_major_axis, discovery_year, discovery_method, is_habitable) VALUES
+-- ('Kepler-186 f', 3, 'rocky', 1.17, 129.94, 0.432, 2014, 'transit', TRUE),
+-- ('Kepler-186 e', 3, 'rocky', 1.27, 22.41, 0.110, 2014, 'transit', FALSE);
 
--- sql2text: тестовая астрономическая БД
--- Таблица звёзд
-
-CREATE TABLE IF NOT EXISTS stars (
-    id        SERIAL PRIMARY KEY,          -- суррогатный ключ
-    name      TEXT,                        -- полнгое имя
-    shortname TEXT,                        -- краткое имя
-    hr        INTEGER,                     -- связь с каталогом HR
-    dblstar   CHAR(1)                      -- признак кратной звезды: двойные-тройные
-);
 
 COMMENT ON TABLE  stars           IS 'Звёзды';
 COMMENT ON COLUMN stars.name      IS 'Полное имя звезды';
