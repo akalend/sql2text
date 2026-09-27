@@ -3,7 +3,19 @@
 
 ## Схема БД: Звёзды · Созвездия · Экзопланеты · Галактики
 
-Реляционная схема в файле [`schema.sql`](./schema.sql) (диалект PostgreSQL).
+Реляционная схема в файле [`schema.sql`](./schema.sql) — **PostgreSQL 14+** (проверено на PostgreSQL 15: скрипт выполняется без ошибок).
+
+Использованы возможности именно PostgreSQL: `GENERATED ALWAYS AS IDENTITY`, `ENUM`-типы, `TIMESTAMPTZ`, `NUMERIC`, массивы `TEXT[]`, регулярный `CHECK` (`~`), частичный индекс (`WHERE is_habitable`), GIN-индекс по массиву, триггер `BEFORE UPDATE ... EXECUTE FUNCTION` для `updated_at`, plpgsql-функция.
+
+### Как запустить
+```bash
+createdb astro_db
+psql -d astro_db -v ON_ERROR_STOP=1 -f schema.sql
+# или через Docker:
+docker run -d --name pg-astro -e POSTGRES_PASSWORD=pass -p 5432:5432 postgres:16
+docker exec -i pg-astro psql -U postgres -c "CREATE DATABASE astro_db"
+docker exec -i pg-astro psql -U postgres -d astro_db < schema.sql
+```
 
 ### ER-диаграмма
 
