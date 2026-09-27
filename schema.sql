@@ -5,10 +5,12 @@ CREATE TABLE IF NOT EXISTS stars (
     id        SERIAL PRIMARY KEY,          -- суррогатный ключ
     name      TEXT,                        -- полнгое имя
     shortname TEXT,                        -- краткое имя
-    hr        INTEGER                      -- связь с каталогом HR
+    hr        INTEGER,                     -- связь с каталогом HR
+    dblstar   CHAR(1)                      -- признак кратной звезды: двойные-тройные
 );
 
 COMMENT ON TABLE  stars           IS 'Звёзды';
 COMMENT ON COLUMN stars.name      IS 'Полное имя звезды';
 COMMENT ON COLUMN stars.shortname IS 'Краткое имя звезды';
 COMMENT ON COLUMN stars.hr        IS 'Номер в каталоге HR';
+COMMENT ON COLUMN stars.dblstar   IS 'Признак кратной звезды (двойные-тройные), CHAR(1)';
