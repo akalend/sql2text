@@ -9,8 +9,6 @@
 --   psql -c "CREATE DATABASE astro_db" && psql -d astro_db -f schema.sql
 -- =====================================================================
 
-BEGIN;
-
 -- Расширение для генерации UUID (PostgreSQL):
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
@@ -196,4 +194,19 @@ INSERT INTO exoplanet (name, star_id, planet_type, radius_earth, orbital_period_
 ('Kepler-186 f', 3, 'rocky', 1.17, 129.94, 0.432, 2014, 'transit', TRUE),
 ('Kepler-186 e', 3, 'rocky', 1.27, 22.41, 0.110, 2014, 'transit', FALSE);
 
-COMMIT;
+-- sql2text: тестовая астрономическая БД
+-- Таблица звёзд
+
+CREATE TABLE IF NOT EXISTS stars (
+    id        SERIAL PRIMARY KEY,          -- суррогатный ключ
+    name      TEXT,                        -- полнгое имя
+    shortname TEXT,                        -- краткое имя
+    hr        INTEGER,                     -- связь с каталогом HR
+    dblstar   CHAR(1)                      -- признак кратной звезды: двойные-тройные
+);
+
+COMMENT ON TABLE  stars           IS 'Звёзды';
+COMMENT ON COLUMN stars.name      IS 'Полное имя звезды';
+COMMENT ON COLUMN stars.shortname IS 'Краткое имя звезды';
+COMMENT ON COLUMN stars.hr        IS 'Номер в каталоге HR';
+COMMENT ON COLUMN stars.dblstar   IS 'Признак кратной звезды (двойные-тройные), CHAR(1)';
