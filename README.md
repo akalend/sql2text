@@ -2,7 +2,7 @@
 генерация QWEN=coder 3.5
 
 
-## Схема БД: Звёзды (stars) · Созвездия · Экзопланеты · Галактики
+## Схема БД: Галактики · Созвездия · Звёзды · Экзопланеты
 
 Реляционная схема в файле [`schema.sql`](./schema.sql) — **PostgreSQL 14+** (проверено на PostgreSQL 15: скрипт выполняется без ошибок).
 
@@ -23,81 +23,93 @@ docker exec -i pg-astro psql -U postgres -d astro_db < schema.sql
 ```mermaid
 erDiagram
     GALAXY        ||--o{ CONSTELLATION : "содержит"
-    GALAXY        ||--o{ STAR           : "в галактике"
-    CONSTELLATION ||--o{ STAR           : "в созвездии"
-    STAR          ||--o{ EXOPLANET      : "хост-звезда"
-    STARS         ||--o| STAR           : "та же звезда (каталог HR)"
-
-    STARS {
-        int     id PK "суррогатный ключ"
-        string  name "полное имя звезды"
-        string  shortname "краткое имя звезды"
-        int     hr "номер в каталоге HR"
-        char    dblstar "признак кратной звезды: двойные-тройные"
-    }
+    CONSTELLATION ||--o{ STAR          : "в созвездии"
+    STAR          ||--o{ EXOPLANET     : "хост-звезда"
 
     GALAXY {
-        int     galaxy_id PK
-        string  name UK "Млечный Путь"
-        string  galaxy_type "spiral / elliptical / irregular"
-        numeric diameter_ly
-        numeric mass_suns
-        numeric distance_ly
+        bigint  galaxy_id PK
+        varchar name UK "Млечный Путь"
+        text    alt_names "массив TEXT[]"
+        enum    galaxy_type "spiral / elliptical / irregular ..."
+        numeric diameter_ly "диаметр, св. годы"
+        numeric mass_suns "массы Солнца"
+        numeric distance_ly "от Земли, св. годы"
+        varchar constellation "наблюдается в созвездии"
+        varchar discovered_by
+        int     discovery_year
+        text    description
     }
 
     CONSTELLATION {
-        int     constellation_id PK
-        string  name "Лира"
-        string  latin_name UK "Lyra"
+        bigint  constellation_id PK "SERIAL"
+        varchar name "Лира"
+        varchar latin_name UK "Lyra"
         char    abbr UK "Lyr"
-        int     galaxy_id FK
-        numeric area_sq_deg
-        string  brightest_star
+        bigint  galaxy_id FK "ON DELETE RESTRICT"
+        numeric area_sq_deg "кв. градусы"
+        varchar brightest_star
+        varchar right_ascension
+        varchar declination
+        varchar season_peak
+        varchar myth_origin
+        text    description
     }
 
     STAR {
-        int     star_id PK
-        string  name "Вега"
-        string  bayer_designation "Alpha Lyrae"
-        string  catalog_id UK "HIP / HD"
-        int     constellation_id FK "NULL для объектов вне созвездий"
-        int     galaxy_id FK
-        string  spectral_class "O B A F G K M"
+        bigint  star_id PK
+        varchar name "Вега"
+        varchar bayer_designation "alpha Lyrae"
+        varchar catalog_id UK "HIP / HD / SAO"
+        bigint  constellation_id FK "NULL вне созвездий"
+        varchar spectral_class "O B A F G K M + светимость"
+        varchar luminosity_class "Ia II V ..."
         numeric mass_suns
         numeric radius_suns
         int     temperature_k
         numeric distance_ly
-        numeric magnitude_app
+        numeric magnitude_app "видимая зв. величина"
+        numeric magnitude_abs "абсолютная зв. величина"
+        numeric ra_deg
+        numeric dec_deg
+        numeric proper_motion
+        bool    is_variable
+        int     year_discovered
+        text    description
     }
 
     EXOPLANET {
-        int     exoplanet_id PK
-        string  name UK "Kepler-186 f"
-        int     star_id FK "NULL для свободно плавающих"
-        string  planet_type "rocky / gas_giant / hot_jupiter"
+        bigint  exoplanet_id PK
+        varchar name UK "Kepler-186 f"
+        bigint  star_id FK "NULL свободно плавающая"
+        enum    planet_type "rocky / gas_giant / hot_jupiter ..."
+        numeric mass_jup
         numeric mass_earth
+        numeric radius_jup
         numeric radius_earth
-        numeric orbital_period_d
+        numeric orbital_period_d "сутки"
         numeric semi_major_axis "а.е."
+        numeric eccentricity "0 <= e < 1"
+        numeric inclination_deg
+        int     eq_temperature_k
         int     discovery_year
-        string  discovery_method
+        enum    discovery_method "transit / radial_velocity ..."
+        varchar discoverer
         bool    is_habitable
+        bool    confirmed
+        text    description
     }
 ```
 
-### Текстовая иерархия связей
-
 ```
 galaxy (галактика)
-  └── constellation (созвездие)           N:1 — созвездие наблюдается в галактике
-        └── star (звезда)                 N:1 — звезда принадлежит созвездию
-              └── exoplanet (экзопланета) N:1 — планета обращается вокруг звезды
-star → galaxy                             N:1 — прямая ссылка на галактику
-stars (каталог HR)                        независимая справочная таблица звёзд
+  └── constellation (созвездие)           N:1 — созвездие наблюдается в галактике (FK, ON DELETE RESTRICT)
+        └── star (звезда)                 N:1 — звезда принадлежит созвездию (constellation_id NULL допустим)
+              └── exoplanet (экзопланета) N:1 — планета обращается вокруг звезды (star_id NULL допустим)
+stars (каталог HR)                        независимая справочная таблица (вне схемы schema.sql)
 ```
 
-Кардинальность:
-* одна **галактика** → много **созвездий** и **звёзд**;
+Кардинальность (по `schema.sql`):
+* одна **галактика** → много **созвездий**;
 * одно **созвездие** → много **звёзд**;
 * одна **звезда** → много **экзопланет**;
 * экзопланета без хоста (`star_id = NULL`) — свободно плавающая планета;
@@ -105,7 +117,7 @@ stars (каталог HR)                        независимая спра
 
 ### Таблица `stars` — каталог звёзд (HR)
 
-Упрощённая справочная таблица звёзд, дополняющая основную схему:
+Независимая справочная таблица, дополняющая основную схему:
 
 | Поле | Тип | Описание |
 |---|---|---|
